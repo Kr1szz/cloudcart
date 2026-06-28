@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # MySQL / Amazon RDS Simulated Database Container
+  db:
+    image: mysql:8.0
+    container_name: cloudcart-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cloudcart
+    ports:
+      - "3306:3306"
+    volumes:
+      # Automatically initialize database schema and seed data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./database/seeds.sql:/docker-entrypoint-initdb.d/2-seeds.sql
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # Express Backend Application Container
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloudcart-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=cloudcart
+      - JWT_SECRET=cloudcart_secret_session_key_production_2026_mca_project
+      - JWT_EXPIRES_IN=7d
+      - AWS_REGION=us-east-1
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # React Frontend Container
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cloudcart-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # Adminer Database Management Tool
+  adminer:
+    image: adminer:latest
+    container_name: cloudcart-adminer
+    restart: always
+    ports:
+      - "8085:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+volumes:
+  mysql-data:
