@@ -6,21 +6,29 @@ const senderEmail = process.env.SES_SENDER_EMAIL || 'noreply@cloudcart.com';
 
 let sesClient = null;
 
-if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID') {
+const hasStaticCredentials =
+  process.env.AWS_ACCESS_KEY_ID &&
+  process.env.AWS_SECRET_ACCESS_KEY &&
+  process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID';
+
+const shouldInitialize = hasStaticCredentials || process.env.NODE_ENV === 'production';
+
+if (shouldInitialize) {
   try {
-    sesClient = new SESClient({
-      region,
-      credentials: {
+    const config = { region };
+    if (hasStaticCredentials) {
+      config.credentials = {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-      }
-    });
-    logger.info("Amazon SES Client initialized.");
+      };
+    }
+    sesClient = new SESClient(config);
+    logger.info("Amazon SES Client initialized successfully.");
   } catch (error) {
     logger.warn("Failed to initialize AWS SES client, emails will be logged instead:", error.message);
   }
 } else {
-  logger.warn("SES access keys missing or default. Email notification will be output to logs.");
+  logger.warn("SES client not initialized (no credentials and not in production). Email notification will be output to logs.");
 }
 
 /**

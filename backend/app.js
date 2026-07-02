@@ -15,6 +15,9 @@ const adminRoutes = require("./routes/admin.routes");
 
 const app = express();
 
+// Nginx terminates the public request and forwards it to Express locally.
+app.set("trust proxy", 1);
+
 // Security Middleware
 app.use(helmet({
   crossOriginResourcePolicy: false // Allow loading images locally

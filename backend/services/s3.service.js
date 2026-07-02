@@ -6,10 +6,15 @@ const bucketName = process.env.S3_BUCKET_NAME;
 
 let s3Client = null;
 
-if (bucketName && bucketName !== 'cloudcart-media-bucket-mca') {
+if (bucketName) {
   try {
     const config = { region };
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID') {
+    const hasStaticCredentials =
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY &&
+      process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID';
+
+    if (hasStaticCredentials) {
       config.credentials = {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
@@ -42,8 +47,7 @@ const uploadImage = async (fileBuffer, fileName, mimeType) => {
       Bucket: bucketName,
       Key: uniqueKey,
       Body: fileBuffer,
-      ContentType: mimeType,
-      ACL: 'public-read' // Assumes public read-enabled bucket policy, or we will access via CloudFront
+      ContentType: mimeType
     });
 
     await s3Client.send(command);

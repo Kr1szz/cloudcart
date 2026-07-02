@@ -1,8 +1,11 @@
+const path = require("path");
+
 module.exports = {
   apps: [
     {
       name: "cloudcart-api",
-      script: "../../backend/server.js",
+      cwd: path.resolve(__dirname, "../../backend"),
+      script: "server.js",
       instances: 1, // Set to 'max' for clustering on multi-core EC2
       autorestart: true,
       watch: false,

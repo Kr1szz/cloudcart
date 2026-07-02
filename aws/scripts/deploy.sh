@@ -3,8 +3,12 @@
 
 set -e # Exit on any failure
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 echo "========================================="
 echo "Starting CloudCart EC2 Deployment Script"
+echo "Project directory: ${PROJECT_DIR}"
 echo "========================================="
 
 # 1. Update system packages
@@ -31,35 +35,29 @@ if ! command -v pm2 &> /dev/null; then
     sudo npm install -y -g pm2
 fi
 
-# 5. Create deployment directory and copy project
-PROJECT_DIR="/var/web/cloudcart"
-echo "Setting up project directory at ${PROJECT_DIR}..."
-sudo mkdir -p ${PROJECT_DIR}
-sudo chown -R $USER:$USER ${PROJECT_DIR}
-
-# Assuming deployment files are copied here via Github Actions or CI/CD
-# Copy files into PROJECT_DIR (simulate copying source code)
-cp -r ../../backend ${PROJECT_DIR}/
-cp -r ../../frontend ${PROJECT_DIR}/
-cp -r ../../aws ${PROJECT_DIR}/
+# 5. Verify production environment configuration
+if [ ! -f "${PROJECT_DIR}/backend/.env" ]; then
+    echo "Missing backend/.env. Copy backend/.env.example to backend/.env and fill in your AWS/RDS values first."
+    exit 1
+fi
 
 # 6. Install Backend Dependencies
 echo "Installing backend dependencies..."
-cd ${PROJECT_DIR}/backend
-npm install --omit=dev
+cd "${PROJECT_DIR}/backend"
+npm ci --omit=dev
 
 # Create uploads folder
 mkdir -p uploads
 
 # 7. Install Frontend Dependencies & Build
 echo "Building React static files..."
-cd ${PROJECT_DIR}/frontend
-npm install
+cd "${PROJECT_DIR}/frontend"
+npm ci
 npm run build
 
 # 8. Configure Nginx Virtual Host
 echo "Configuring Nginx reverse proxy..."
-sudo cp ${PROJECT_DIR}/aws/nginx/cloudcart.conf /etc/nginx/sites-available/cloudcart
+sudo cp "${PROJECT_DIR}/aws/nginx/cloudcart.conf" /etc/nginx/sites-available/cloudcart
 sudo ln -sf /etc/nginx/sites-available/cloudcart /etc/nginx/sites-enabled/
 # Remove default nginx site
 sudo rm -f /etc/nginx/sites-enabled/default
@@ -70,13 +68,13 @@ sudo systemctl reload nginx
 
 # 9. Start/Restart PM2 Backend Process
 echo "Starting Node server via PM2..."
-cd ${PROJECT_DIR}/aws/pm2
+cd "${PROJECT_DIR}/aws/pm2"
 mkdir -p ../logs
 pm2 startOrReload ecosystem.config.js --env production
 pm2 save
 
 # Setup PM2 startup scripts to launch on EC2 reboot
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp /home/$USER
+sudo env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$USER" --hp "/home/$USER"
 
 echo "========================================="
 echo "CloudCart Deployment Completed Successfully!"

@@ -6,21 +6,29 @@ const path = require("path");
 const region = process.env.AWS_REGION || "us-east-1";
 let lambdaClient = null;
 
-if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID') {
+const hasStaticCredentials =
+  process.env.AWS_ACCESS_KEY_ID &&
+  process.env.AWS_SECRET_ACCESS_KEY &&
+  process.env.AWS_ACCESS_KEY_ID !== 'YOUR_AWS_ACCESS_KEY_ID';
+
+const shouldInitialize = hasStaticCredentials || process.env.NODE_ENV === 'production';
+
+if (shouldInitialize) {
   try {
-    lambdaClient = new LambdaClient({
-      region,
-      credentials: {
+    const config = { region };
+    if (hasStaticCredentials) {
+      config.credentials = {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-      }
-    });
-    logger.info("AWS Lambda Client initialized.");
+      };
+    }
+    lambdaClient = new LambdaClient(config);
+    logger.info("AWS Lambda Client initialized successfully.");
   } catch (error) {
     logger.warn("Failed to initialize AWS Lambda client, using local mock invoice instead:", error.message);
   }
 } else {
-  logger.warn("Lambda access credentials missing. Using local mock invoice system.");
+  logger.warn("Lambda client not initialized (no credentials and not in production). Using local mock invoice system.");
 }
 
 /**
